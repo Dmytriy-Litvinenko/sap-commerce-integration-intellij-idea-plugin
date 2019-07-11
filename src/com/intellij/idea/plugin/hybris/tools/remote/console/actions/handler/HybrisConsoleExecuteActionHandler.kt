@@ -3,15 +3,22 @@ package com.intellij.idea.plugin.hybris.tools.remote.console.actions.handler
 
 import com.intellij.execution.console.ConsoleHistoryController
 import com.intellij.execution.impl.ConsoleViewUtil
-import com.intellij.execution.ui.ConsoleViewContentType.*
+import com.intellij.execution.ui.ConsoleViewContentType.ERROR_OUTPUT
+import com.intellij.execution.ui.ConsoleViewContentType.NORMAL_OUTPUT
+import com.intellij.execution.ui.ConsoleViewContentType.SYSTEM_OUTPUT
 import com.intellij.idea.plugin.hybris.impex.file.ImpexFileType
 import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisConsole
+import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisFSConsole
+import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisGroovyConsole
+import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisImpexConsole
 import com.intellij.idea.plugin.hybris.tools.remote.console.HybrisImpexMonitorConsole
 import com.intellij.idea.plugin.hybris.tools.remote.console.SolrConsole
 import com.intellij.idea.plugin.hybris.tools.remote.console.view.HybrisTabs
+import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
 import com.intellij.idea.plugin.hybris.tools.remote.http.impex.HybrisHttpResult
 import com.intellij.idea.plugin.hybris.tools.remote.http.impex.HybrisHttpResult.HybrisHttpResultBuilder.createResult
 import com.intellij.json.JsonFileType
+import com.intellij.idea.plugin.hybris.tools.remote.http.monitorImpexFiles
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.PlainTextFileType
@@ -41,19 +48,30 @@ class HybrisConsoleExecuteActionHandler(private val project: Project,
                     isProcessRunning = true
                     try {
                         setEditorEnabled(console, false)
-                        val httpResult = console.execute(query)
-
+                        val client = HybrisHacHttpClient()
+                        val httpResult =
+                                when (console) {
+                                    is HybrisFSConsole -> client.executeFlexibleSearch(project, true, false, "100", query)
+                                    is HybrisImpexConsole ->  console.execute(query)
+                                    is HybrisGroovyConsole -> client.executeGroovyScript(project, query, true)
+                                    is HybrisImpexMonitorConsole -> monitorImpexFiles(console.timeOption().value, console.timeOption().unit, console.workingDir())
+                                    else -> null
+                                }
                         when (console) {
                             is HybrisImpexMonitorConsole -> {
                                 console.clear()
-                                printSyntaxText(console, httpResult.output, ImpexFileType.getInstance())
+                                if (httpResult != null) {
+                                    printSyntaxText(console, httpResult.output, ImpexFileType.getInstance())
+                                }
                             }
                             is SolrConsole -> {
                                 console.clear()
-                                if (httpResult.hasError()) {
-                                    printSyntaxText(console, httpResult.errorMessage, PlainTextFileType.INSTANCE)
-                                } else {
-                                    printSyntaxText(console, httpResult.output, JsonFileType.INSTANCE)
+                                if (httpResult != null) {
+                                    if (httpResult.hasError()) {
+                                        printSyntaxText(console, httpResult.errorMessage, PlainTextFileType.INSTANCE)
+                                    } else {
+                                        printSyntaxText(console, httpResult.output, JsonFileType.INSTANCE)
+                                    }
                                 }
 
                             }

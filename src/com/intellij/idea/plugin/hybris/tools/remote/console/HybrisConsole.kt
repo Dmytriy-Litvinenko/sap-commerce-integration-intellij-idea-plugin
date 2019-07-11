@@ -15,6 +15,8 @@ import com.intellij.idea.plugin.hybris.tools.remote.console.preprocess.HybrisCon
 import com.intellij.idea.plugin.hybris.tools.remote.http.HybrisHacHttpClient
 import com.intellij.idea.plugin.hybris.tools.remote.http.impex.HybrisHttpResult
 import com.intellij.idea.plugin.hybris.tools.remote.http.monitorImpexFiles
+
+import com.intellij.idea.plugin.hybris.flexibleSearch.FlexibleSearchLanguage
 import com.intellij.lang.Language
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
@@ -132,6 +134,19 @@ class HybrisImpexConsole(project: Project) : HybrisConsole(project, IMPEX_CONSOL
     }
 }
 
+class HybrisFSConsole(project: Project) : HybrisConsole(project, "Hybris FS Console", FlexibleSearchLanguage.getInstance()) {
+    private val commitCheckbox = JBCheckBox()
+    override fun execute(query: String): HybrisHttpResult {
+        return HybrisHacHttpClient.getInstance(project).executeFlexibleSearch(project, commitCheckbox.isSelected, false, "100", query)//HybrisHacHttpClient.getInstance(project)
+    }
+
+    object MyConsoleRootType : ConsoleRootType("hybris.fs.shell", null)
+
+    init {
+        ConsoleHistoryController(MyConsoleRootType, "hybris.fs.shell", this).install()
+    }
+}
+
 class HybrisGroovyConsole(project: Project) : HybrisConsole(project, GROOVY_CONSOLE_TITLE, GroovyLanguage) {
 
     object MyConsoleRootType : ConsoleRootType("hybris.groovy.shell", null)
@@ -206,9 +221,9 @@ class HybrisImpexMonitorConsole(project: Project) : HybrisConsole(project, IMPEX
         return toCanonicalPath("${project.basePath}${File.separatorChar}${settings.hybrisDirectory}${File.separatorChar}${HybrisConstants.HYBRIS_DATA_DIRECTORY}")
     }
 
-    private fun timeOption() = (timeComboBox.selectedItem as TimeOption)
+    internal fun timeOption() = (timeComboBox.selectedItem as TimeOption)
 
-    private fun workingDir() = obtainDataFolder(project)
+    internal fun workingDir() = obtainDataFolder(project)
 
     override fun execute(query: String): HybrisHttpResult {
         return monitorImpexFiles(timeOption().value, timeOption().unit, workingDir())
